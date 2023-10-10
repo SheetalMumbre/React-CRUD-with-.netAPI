@@ -7,10 +7,13 @@ import {
   TextField,
   withStyles,
   Button,
+  FormHelperText,
 } from "@material-ui/core";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import useForm from "./useForm";
-import Box from "@mui/material/Box";
+import { connect } from "react-redux";
+import * as actions from "../actions/dCandidate";
+import {useToasts} from "react-toast-notifications";
 
 const styles = (theme) => ({
   root: {
@@ -38,23 +41,57 @@ const initialFieldValues = {
 };
 
 const DCandidateForm = ({ classes, ...props }) => {
-  const validate = () => {
-    let temp = {}
-    temp.fullName = values.fullName?"" : "This field is required."
-    temp.mobile = values.mobile?"" : "This field is required."
-    temp.bloodGroup = values.bloodGroup?"" : "This field is required."
-    temp.email = (/^$|.+@.+..+/).test(values.email)?"":"Email is not valid"
+  //toast msg
+  const {addToast} = useToasts()
+  //validate()
+  //validate({fullname:'jenny})
+  const validate = (fieldValues = values) => {
+    let temp = {...errors}
+    if('fullName' in fieldValues)
+    temp.fullName = fieldValues.fullName?"" : "This field is required."
+    if('mobile' in fieldValues)
+    temp.mobile = fieldValues.mobile?"" : "This field is required."
+    if('bloodGroup' in fieldValues)
+    temp.bloodGroup = fieldValues.bloodGroup?"" : "This field is required."
+    if('email' in fieldValues)
+    temp.email = (/^$|.+@.+..+/).test(fieldValues.email)?"":"Email is not valid"
     setErrors({
       ...temp
     })
+
+    if(fieldValues== values)
+      return Object.values(temp).every(x => x=="")
   };
 
-  const { values, setValues, handleInputChange, errors, setErrors } = useForm(initialFieldValues);
+  const { 
+    values, setValues, handleInputChange, errors, setErrors , resetForm
+  } = useForm(initialFieldValues, validate, props.setCurrentId);
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    console.log(values);
+    // console.log(values);
+    if(validate()){
+      const onSuccess = () => { 
+        resetForm()
+        addToast("Submitted Successfully", {appearance:'success'})
+      }
+      
+      // window.alert("validation succeeded")
+      if(props.currentId == 0)
+        props.createDCandidate(values,onSuccess)
+      else
+        props.updateDCandidate(props.currentId, values, onSuccess)
+    }
   };
+
+  useEffect(()=>{
+    if(props.currentId!=0){
+      setValues({
+        ...props.dCandidateList.find(x=> x.id==props.currentId)
+      })
+      setErrors({})
+    }
+  },[props.currentId])
 
   return (
     <form
@@ -71,6 +108,9 @@ const DCandidateForm = ({ classes, ...props }) => {
             label="Full Name"
             value={values.fullName}
             onChange={handleInputChange}
+            // error={true}
+            // helperText={errors.fullName}
+            {...(errors.fullName && {error:true, helperText:errors.fullName})}
           />
           <TextField
             name="email"
@@ -78,8 +118,11 @@ const DCandidateForm = ({ classes, ...props }) => {
             label="Email"
             value={values.email}
             onChange={handleInputChange}
+            {...(errors.email && {error:true, helperText:errors.email})}
           />
-          <FormControl variant="outlined">
+          <FormControl variant="outlined"
+             className={classes.formControl}
+              {...(errors.bloodGroup && {error:true})}>
             <InputLabel>Blood Group</InputLabel>
             <Select
               name="bloodGroup"
@@ -96,6 +139,7 @@ const DCandidateForm = ({ classes, ...props }) => {
               <MenuItem value="O+"> O +ve</MenuItem>
               <MenuItem value="O-"> O -ve</MenuItem>
             </Select>
+            {errors.bloodGroup && <FormHelperText>{errors.bloodGroup}</FormHelperText>}
           </FormControl>
         </Grid>
         <Grid item xs={6}>
@@ -105,6 +149,7 @@ const DCandidateForm = ({ classes, ...props }) => {
             label="Mobile"
             value={values.mobile}
             onChange={handleInputChange}
+            {...(errors.mobile && {error:true, helperText:errors.mobile})}
           />
           <TextField
             name="age"
@@ -129,7 +174,7 @@ const DCandidateForm = ({ classes, ...props }) => {
             >
               Submit
             </Button>
-            <Button variant="contained" className={classes.smMargin}>
+            <Button variant="contained" className={classes.smMargin} onClick={resetForm}>
               Reset
             </Button>
           </div>
@@ -139,4 +184,13 @@ const DCandidateForm = ({ classes, ...props }) => {
   );
 };
 
-export default withStyles(styles)(DCandidateForm);
+const mapStateToProps = state => ({
+  dCandidateList : state.dCandidate.list
+})
+
+const mapActionToProps = {
+  createDCandidate: actions.create,
+  updateDCandidate: actions.update
+}
+
+export default connect(mapStateToProps,mapActionToProps) (withStyles(styles)(DCandidateForm));
